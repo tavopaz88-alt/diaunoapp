@@ -12,7 +12,7 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "reto-metas"
-database_id = "REEMPLAZAR_CON_EL_ID_REAL"
+database_id = "7f7753d7-1688-45ea-ae2f-22d0bb1a6b80"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
