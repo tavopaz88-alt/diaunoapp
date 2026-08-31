@@ -122,5 +122,9 @@ npm run typecheck
 
 ## Despliegue
 
-Ver [docs/despliegue.md](docs/despliegue.md). El repositorio esta conectado a
-Cloudflare Workers Builds: cada push a `main` compila y publica solo.
+Ver [docs/despliegue.md](docs/despliegue.md).
+
+Está preparado para **Cloudflare Workers Builds**: una vez conectado el
+repositorio, cada push a `main` compila la SPA y publica el Worker solo, con
+`npm run build` y `npm run cf:deploy`. También se puede desplegar a mano desde tu
+máquina con `npm run deploy`.
