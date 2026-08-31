@@ -51,8 +51,19 @@ rutas.post('/setup', async (c) => {
   if ((cuenta?.n ?? 0) > 0) throw conflicto('La aplicación ya está instalada');
 
   const token = textoRequerido(datos, 'token');
-  if (!c.env.SETUP_TOKEN || token !== c.env.SETUP_TOKEN) {
-    throw noAutorizado('Token de instalación invalido');
+
+  // Se recorta de los dos lados. Al cargar el secreto por el prompt de wrangler
+  // es fácil que se cuele un salto de línea o un espacio al final, y entonces se
+  // rechazaba el token correcto sin que nada lo explicara.
+  const esperado = (c.env.SETUP_TOKEN ?? '').trim();
+
+  if (!esperado) {
+    throw noAutorizado(
+      'El Worker no tiene SETUP_TOKEN configurado. Cargalo con: wrangler secret put SETUP_TOKEN',
+    );
+  }
+  if (token !== esperado) {
+    throw noAutorizado('El token de instalación no coincide con el que tiene el Worker');
   }
 
   const nombre = textoRequerido(datos, 'nombre', { max: 80 });
