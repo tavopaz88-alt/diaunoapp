@@ -1,0 +1,35 @@
+name = "reto-metas"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# El mismo Worker sirve la API (/api/*) y la SPA compilada.
+# Un solo dominio => sin CORS y un solo despliegue.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "reto-metas"
+database_id = "REEMPLAZAR_CON_EL_ID_REAL"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FOTOS"
+bucket_name = "reto-metas-fotos"
+
+# Correo diario con la frase del dia: 12:00 UTC = 06:00 en Guatemala.
+[triggers]
+crons = ["0 12 * * *"]
+
+[vars]
+ZONA_HORARIA = "America/Guatemala"
+APP_URL = "https://reto.conectamierp.com"
+EMAIL_FROM = "Reto <reto@conectamierp.com>"
+EMAIL_ACTIVO = "false"
+
+# Secretos (wrangler secret put NOMBRE):
+#   JWT_SECRET     cadena larga aleatoria para firmar sesiones
+#   SETUP_TOKEN    token de un solo uso para crear el primer administrador
+#   RESEND_API_KEY api key de Resend para el envio de correo

@@ -1,0 +1,3 @@
+JWT_SECRET=cambia-esto-por-una-cadena-larga-aleatoria-de-al-menos-32-caracteres
+SETUP_TOKEN=token-para-crear-el-primer-admin
+RESEND_API_KEY=

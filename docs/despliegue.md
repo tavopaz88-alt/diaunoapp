@@ -1,0 +1,243 @@
+# Despliegue en Cloudflare
+
+De cero a la app corriendo en `reto.conectamierp.com`. Cada paso dice qué esperar,
+para que sepas si algo salió mal antes de seguir.
+
+Todo se ejecuta desde la raíz del proyecto salvo donde se indique.
+
+---
+
+## 1. Entrar a Cloudflare
+
+```bash
+npx wrangler login
+```
+
+Abre el navegador y pide autorizar. Al terminar:
+
+```bash
+npx wrangler whoami
+```
+
+Debe mostrar tu cuenta y su Account ID.
+
+---
+
+## 2. Crear la base de datos
+
+```bash
+npx wrangler d1 create reto-metas
+```
+
+Devuelve algo así:
+
+```
+database_name = "reto-metas"
+database_id = "a1b2c3d4-...."
+```
+
+**Copia ese `database_id` a `api/wrangler.toml`**, reemplazando
+`REEMPLAZAR_CON_EL_ID_REAL`. Sin esto el despliegue falla.
+
+Aplica el esquema a la base real:
+
+```bash
+npm run db:remoto
+```
+
+Debe listar `0001_esquema_inicial.sql` con estado ✅.
+
+---
+
+## 3. Crear el bucket de fotos (opcional)
+
+Las fotos de perfil se guardan en R2. **Si no quieres usar R2, salta este paso** y
+borra el bloque `[[r2_buckets]]` de `api/wrangler.toml`: la app funciona igual y
+solo se desactivan las fotos (los avatares muestran la inicial del nombre).
+
+```bash
+npx wrangler r2 bucket create reto-metas-fotos
+```
+
+Si tu cuenta aún no tiene R2 activado, el panel te lo pedirá una vez.
+
+---
+
+## 4. Configurar los secretos
+
+Genera un `JWT_SECRET` largo y aleatorio:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Y cárgalo, junto con el token de instalación:
+
+```bash
+cd api
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put SETUP_TOKEN
+```
+
+- `JWT_SECRET` firma las sesiones. Si lo cambias después, todos tienen que volver
+  a entrar.
+- `SETUP_TOKEN` es de un solo uso real: la instalación solo corre con la base
+  vacía, así que después de instalar deja de servir para nada.
+
+El de correo (`RESEND_API_KEY`) se agrega en el paso 8.
+
+---
+
+## 5. Ajustar las variables del reto
+
+En `api/wrangler.toml`, bloque `[vars]`:
+
+```toml
+ZONA_HORARIA = "America/Guatemala"   # define de qué día se trata cada marca
+APP_URL      = "https://reto.conectamierp.com"
+EMAIL_FROM   = "Reto <reto@conectamierp.com>"
+EMAIL_ACTIVO = "false"               # se pone en "true" en el paso 8
+```
+
+`ZONA_HORARIA` es importante: es la que decide cuándo cambia el día para todos.
+No la derives del teléfono de cada quien.
+
+---
+
+## 6. Compilar y desplegar
+
+```bash
+npm run deploy
+```
+
+Compila la SPA hacia `api/public` y publica el Worker con la SPA incluida. Al
+terminar imprime una URL `https://reto-metas.<tu-subdominio>.workers.dev`.
+
+Ábrela: debe salir la pantalla de instalación.
+
+---
+
+## 7. Poner el dominio
+
+En el panel de Cloudflare: **Workers & Pages → reto-metas → Settings → Domains &
+Routes → Add → Custom domain**, y escribe `reto.conectamierp.com`.
+
+Cloudflare crea el registro DNS solo, siempre que `conectamierp.com` ya esté en tu
+cuenta. El certificado tarda unos minutos.
+
+Cuando responda, vuelve a desplegar para que `APP_URL` (que usan los correos)
+apunte al dominio definitivo:
+
+```bash
+npm run deploy
+```
+
+---
+
+## 8. Correo (opcional, para la frase diaria)
+
+Sin esto la app funciona completa; solo no salen correos.
+
+1. Crea una cuenta en [resend.com](https://resend.com).
+2. Verifica el dominio `conectamierp.com` (te da unos registros DNS que agregas en
+   Cloudflare). Sin dominio verificado, Resend solo deja enviarte a ti mismo.
+3. Genera una API key.
+4. Cárgala y activa el envío:
+
+```bash
+cd api
+npx wrangler secret put RESEND_API_KEY
+```
+
+En `api/wrangler.toml` pon `EMAIL_ACTIVO = "true"` y vuelve a desplegar.
+
+El Cron Trigger ya está configurado en `[triggers]`:
+
+```toml
+crons = ["0 12 * * *"]   # 12:00 UTC = 06:00 en Guatemala
+```
+
+Corre todos los días: manda la frase del día (solo si el administrador publicó una)
+y, los lunes, además el resumen semanal.
+
+Para probarlo sin esperar:
+
+```bash
+cd api
+npx wrangler dev --test-scheduled
+# y en otra terminal:
+curl "http://localhost:8787/__scheduled?cron=0+12+*+*+*"
+```
+
+---
+
+## 9. Instalar
+
+Entra a `https://reto.conectamierp.com/instalar` y llena:
+
+- el `SETUP_TOKEN` del paso 4
+- tu nombre, correo y contraseña (quedas como administrador)
+- nombre del reto, fecha de arranque y duración
+
+La pantalla te devuelve el **código de invitación**. Compártelo: sin él nadie se
+puede registrar. Después lo ves y lo cambias en *Administración*.
+
+Comprueba que la instalación quedó cerrada:
+
+```bash
+curl https://reto.conectamierp.com/api/estado
+# {"instalado":true,"reto":{...}}
+```
+
+Un segundo intento de `/instalar` debe responder «La aplicación ya está instalada».
+
+---
+
+## Operación diaria
+
+```bash
+npm run deploy                       # publicar cambios
+cd api && npx wrangler tail          # ver logs en vivo
+```
+
+Consultar la base:
+
+```bash
+cd api
+npx wrangler d1 execute reto-metas --remote --command "SELECT COUNT(*) FROM participaciones"
+```
+
+Respaldo:
+
+```bash
+cd api
+npx wrangler d1 export reto-metas --remote --output respaldo.sql
+```
+
+---
+
+## Cosas que conviene saber
+
+**El costo de la contraseña en el plan gratuito.** El hash usa PBKDF2 con 100.000
+iteraciones, que es lo correcto para almacenar contraseñas pero consume CPU. El
+plan gratuito de Workers da 10 ms de CPU por petición, y solo el registro y el
+inicio de sesión llegan a ese punto (marcar el día no). Si ves errores de CPU al
+entrar, tienes dos salidas: subir al plan Workers de pago (5 USD al mes, 30 s de
+CPU) o bajar `ITERACIONES_ACTUALES` en
+[`api/src/lib/password.ts`](../api/src/lib/password.ts). El formato del hash lleva
+dentro sus propias iteraciones, así que cambiarlo **no invalida** las contraseñas
+que ya existen: se verifican con su parámetro original y se rehacen al entrar.
+
+**Límites de D1.** El plan gratuito da 5 GB y 5 millones de lecturas por día. Un
+reto de 30 personas por 30 días son unas pocas miles de filas: no se acerca.
+
+**Sin límite de intentos de login.** No hay bloqueo por fuerza bruta. Para un reto
+por invitación es aceptable; si el registro se abriera, conviene poner Cloudflare
+Rate Limiting sobre `/api/login` desde el panel, que no requiere tocar el código.
+
+**El `ZONA_HORARIA` no es cosmético.** Define qué día es «hoy» para todos. Si el
+grupo está repartido en varios husos, todos comparten el día del reto, no el suyo.
+
+**Retos siguientes.** Al terminar los 30 días, *Administración* permite abrir otro
+reto y arrastrar a los participantes. El anterior queda archivado e intacto para su
+resumen.

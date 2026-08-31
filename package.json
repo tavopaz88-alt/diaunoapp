@@ -1,0 +1,16 @@
+{
+  "name": "reto-metas",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App de seguimiento de metas para retos de habitos de 30 dias",
+  "workspaces": ["api", "web"],
+  "scripts": {
+    "dev": "npm run build --workspace web && npm run dev --workspace api",
+    "dev:web": "npm run dev --workspace web",
+    "build": "npm run build --workspace web",
+    "deploy": "npm run build && npm run deploy --workspace api",
+    "db:local": "npm run db:local --workspace api",
+    "db:remoto": "npm run db:remoto --workspace api",
+    "typecheck": "npm run typecheck --workspace api && npm run typecheck --workspace web"
+  }
+}
