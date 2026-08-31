@@ -83,7 +83,10 @@ h1 { font-size: 1.5rem; font-weight: 700; }
 h2 { font-size: 1.15rem; font-weight: 650; }
 h3 { font-size: 1rem; font-weight: 600; }
 
-p { margin: 0; }
+p {
+  margin: 0;
+  overflow-wrap: break-word;
+}
 
 a {
   color: var(--acento);
@@ -340,11 +343,21 @@ textarea {
   color: var(--acento-texto);
 }
 
+/*
+ * El título envuelve en varias líneas; no se recorta.
+ *
+ * Antes llevaba nowrap + text-overflow: ellipsis, que no hacía nada: el recorte
+ * no aplica a un elemento en línea, así que un título largo se salía de la
+ * tarjeta y arrastraba la página entera a scroll horizontal.
+ *
+ * Recortar tampoco sería lo correcto: es el título de tu propia meta y tenés que
+ * poder leerlo completo. La fila crece, que para eso tiene min-height y no una
+ * altura fija.
+ */
 .marca-titulo {
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 /* --------------------------------------------------------- cuadricula dias */

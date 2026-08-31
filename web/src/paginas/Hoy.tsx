@@ -130,9 +130,9 @@ export function Hoy() {
                 <span className="marca-caja" aria-hidden="true">
                   <Palomita />
                 </span>
+                {/* El titulo es de bloque y envuelve solo: el <br/> sobraba y abria un hueco. */}
                 <span className="crece">
                   <span className="marca-titulo">{meta.titulo}</span>
-                  <br />
                   <ResumenCorto resultado={meta.resultado} />
                 </span>
               </button>
