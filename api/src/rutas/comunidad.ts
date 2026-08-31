@@ -24,7 +24,14 @@ import {
 import { calcularConstancia, resultadoDeMeta, ventanaDe } from '../lib/metricas';
 import { proyectarMeta, veValores, nivelSobreMeta } from '../lib/visibilidad';
 import { nuevoId } from '../lib/ids';
-import { cuerpoJson, malaPeticion, noEncontrado, textoOpcional } from '../lib/respuestas';
+import {
+  cuerpoJson,
+  malaPeticion,
+  noEncontrado,
+  prohibido,
+  textoOpcional,
+  textoRequerido,
+} from '../lib/respuestas';
 
 const rutas = crearRuta();
 
@@ -184,15 +191,13 @@ rutas.get('/perfil/:userId', async (c) => {
   });
 });
 
-/**
- * Animo: una reaccion de un toque. Sin comentarios en esta version, porque los
- * comentarios necesitan moderacion y eso es otro proyecto (seccion 5.5).
- */
+/** Ánimo: una reacción de un toque, sobre un evento, una publicación o un perfil. */
 rutas.post('/animos', async (c) => {
   const { perfil, reto, hoy } = c.get('ctx');
   const datos = await cuerpoJson(c.req.raw);
 
   const eventoId = textoOpcional(datos, 'evento_id', 64);
+  const publicacionId = textoOpcional(datos, 'publicacion_id', 64);
   const paraUsuario = textoOpcional(datos, 'para_user_id', 64);
 
   let destino: string;
@@ -202,25 +207,229 @@ rutas.post('/animos', async (c) => {
       .first<{ user_id: string; reto_id: string }>();
     if (!evento || evento.reto_id !== reto.id) throw noEncontrado('Ese evento no existe');
     destino = evento.user_id;
+  } else if (publicacionId) {
+    const publicacion = await c.env.DB.prepare(
+      'SELECT user_id, reto_id FROM publicaciones WHERE id = ?',
+    )
+      .bind(publicacionId)
+      .first<{ user_id: string; reto_id: string }>();
+    if (!publicacion || publicacion.reto_id !== reto.id) {
+      throw noEncontrado('Esa publicación no existe');
+    }
+    destino = publicacion.user_id;
   } else if (paraUsuario) {
     const participa = await participacionDe(c.env, reto.id, paraUsuario);
     if (!participa) throw noEncontrado('Esa persona no participa en el reto');
     destino = paraUsuario;
   } else {
-    throw malaPeticion('Indica un evento o una persona');
+    throw malaPeticion('Indica un evento, una publicación o una persona');
   }
 
   if (destino === perfil.id) throw malaPeticion('No podés darte ánimo a vos mismo');
 
-  // Los indices unicos limitan a un animo por evento y a uno por perfil por dia.
+  // Los índices únicos limitan a un ánimo por evento, uno por publicación y uno
+  // por perfil por día.
   const resultado = await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO animos (id, de_user_id, para_user_id, evento_id, fecha)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO animos (id, de_user_id, para_user_id, evento_id, publicacion_id, fecha)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(nuevoId(), perfil.id, destino, eventoId ?? null, hoy)
+    .bind(nuevoId(), perfil.id, destino, eventoId ?? null, publicacionId ?? null, hoy)
     .run();
 
   return c.json({ ok: true, nuevo: (resultado.meta.changes ?? 0) > 0 });
+});
+
+// ===========================================================================
+//  PUBLICACIONES Y COMENTARIOS
+//
+//  El muro de logros (arriba) lo escribe la app y es cronológico. Esto lo
+//  escriben las personas.
+//
+//  El feed se ordena por ULTIMA ACTIVIDAD, no por interacciones: una
+//  publicación sube cuando recibe un comentario. Así las conversaciones vivas
+//  quedan arriba sin construir un ranking de popularidad, que en un grupo chico
+//  volvería visible quién recibe atención y quién no. Es la misma razón por la
+//  que el ranking corta en cinco.
+//
+//  Moderación: cada quien borra lo suyo, y un administrador puede borrar
+//  cualquier cosa. Sin eso, el texto libre no tiene remedio.
+// ===========================================================================
+
+const LARGO_PUBLICACION = 1000;
+const LARGO_COMENTARIO = 500;
+
+interface FilaPublicacion {
+  id: string;
+  texto: string;
+  created_at: string;
+  actividad_en: string;
+  user_id: string;
+  nombre: string;
+  foto_url: string | null;
+  meta_id: string | null;
+  meta_titulo: string | null;
+  animos: number;
+  le_di_animo: number;
+}
+
+rutas.get('/publicaciones', async (c) => {
+  const { perfil, reto } = c.get('ctx');
+
+  const { results: publicaciones } = await c.env.DB.prepare(
+    `SELECT p.id AS id, p.texto AS texto, p.created_at AS created_at,
+            p.actividad_en AS actividad_en, p.meta_id AS meta_id,
+            u.id AS user_id, u.nombre AS nombre, u.foto_url AS foto_url,
+            m.titulo AS meta_titulo,
+            (SELECT COUNT(*) FROM animos a WHERE a.publicacion_id = p.id) AS animos,
+            (SELECT COUNT(*) FROM animos a
+              WHERE a.publicacion_id = p.id AND a.de_user_id = ?) AS le_di_animo
+       FROM publicaciones p
+       JOIN profiles u ON u.id = p.user_id
+       LEFT JOIN metas m ON m.id = p.meta_id AND m.visibilidad <> 'privada'
+      WHERE p.reto_id = ?
+      ORDER BY p.actividad_en DESC
+      LIMIT 50`,
+  )
+    .bind(perfil.id, reto.id)
+    .all<FilaPublicacion>();
+
+  const ids = (publicaciones ?? []).map((p) => p.id);
+  const comentariosPorPublicacion = new Map<string, unknown[]>();
+
+  if (ids.length > 0) {
+    const marcadores = ids.map(() => '?').join(',');
+    const { results: comentarios } = await c.env.DB.prepare(
+      `SELECT co.id AS id, co.publicacion_id AS publicacion_id, co.texto AS texto,
+              co.created_at AS created_at,
+              u.id AS user_id, u.nombre AS nombre, u.foto_url AS foto_url
+         FROM comentarios co
+         JOIN profiles u ON u.id = co.user_id
+        WHERE co.publicacion_id IN (${marcadores})
+        ORDER BY co.created_at`,
+    )
+      .bind(...ids)
+      .all<{ publicacion_id: string }>();
+
+    for (const comentario of comentarios ?? []) {
+      const lista = comentariosPorPublicacion.get(comentario.publicacion_id);
+      if (lista) lista.push(comentario);
+      else comentariosPorPublicacion.set(comentario.publicacion_id, [comentario]);
+    }
+  }
+
+  return c.json({
+    soy_admin: perfil.es_admin === 1,
+    publicaciones: (publicaciones ?? []).map((p) => ({
+      ...p,
+      animos: Number(p.animos ?? 0),
+      le_di_animo: Number(p.le_di_animo ?? 0) > 0,
+      // Se puede borrar lo propio; un administrador puede borrar cualquiera.
+      puedo_borrar: p.user_id === perfil.id || perfil.es_admin === 1,
+      comentarios: comentariosPorPublicacion.get(p.id) ?? [],
+    })),
+  });
+});
+
+rutas.post('/publicaciones', async (c) => {
+  const { perfil, reto } = c.get('ctx');
+  const datos = await cuerpoJson(c.req.raw);
+
+  const texto = textoRequerido(datos, 'texto', { max: LARGO_PUBLICACION });
+  const metaId = textoOpcional(datos, 'meta_id', 64);
+
+  // Colgar la publicación de una meta es opcional, pero tiene que ser una meta
+  // propia y no privada: el título es justo lo que su dueño decidió reservar.
+  if (metaId) {
+    const meta = await c.env.DB.prepare(
+      'SELECT user_id, visibilidad FROM metas WHERE id = ? AND reto_id = ?',
+    )
+      .bind(metaId, reto.id)
+      .first<{ user_id: string; visibilidad: string }>();
+
+    if (!meta) throw noEncontrado('Esa meta no existe');
+    if (meta.user_id !== perfil.id) throw prohibido('Esa meta no es tuya');
+    if (meta.visibilidad === 'privada') {
+      throw malaPeticion('No podés vincular una publicación a una meta privada');
+    }
+  }
+
+  const id = nuevoId();
+  await c.env.DB.prepare(
+    'INSERT INTO publicaciones (id, reto_id, user_id, texto, meta_id) VALUES (?, ?, ?, ?, ?)',
+  )
+    .bind(id, reto.id, perfil.id, texto, metaId)
+    .run();
+
+  return c.json({ ok: true, id }, 201);
+});
+
+rutas.delete('/publicaciones/:id', async (c) => {
+  const { perfil, reto } = c.get('ctx');
+
+  const publicacion = await c.env.DB.prepare(
+    'SELECT user_id, reto_id FROM publicaciones WHERE id = ?',
+  )
+    .bind(c.req.param('id'))
+    .first<{ user_id: string; reto_id: string }>();
+
+  if (!publicacion || publicacion.reto_id !== reto.id) {
+    throw noEncontrado('Esa publicación no existe');
+  }
+  if (publicacion.user_id !== perfil.id && perfil.es_admin !== 1) {
+    throw prohibido('Solo su autor o un administrador pueden borrarla');
+  }
+
+  // Los comentarios y los ánimos se van con ella por CASCADE.
+  await c.env.DB.prepare('DELETE FROM publicaciones WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ ok: true });
+});
+
+rutas.post('/publicaciones/:id/comentarios', async (c) => {
+  const { perfil, reto } = c.get('ctx');
+  const publicacionId = c.req.param('id');
+  const datos = await cuerpoJson(c.req.raw);
+  const texto = textoRequerido(datos, 'texto', { max: LARGO_COMENTARIO });
+
+  const publicacion = await c.env.DB.prepare('SELECT reto_id FROM publicaciones WHERE id = ?')
+    .bind(publicacionId)
+    .first<{ reto_id: string }>();
+
+  if (!publicacion || publicacion.reto_id !== reto.id) {
+    throw noEncontrado('Esa publicación no existe');
+  }
+
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      'INSERT INTO comentarios (id, publicacion_id, user_id, texto) VALUES (?, ?, ?, ?)',
+    ).bind(nuevoId(), publicacionId, perfil.id, texto),
+    // Comentar sube la publicación en el feed: ese es el criterio de orden.
+    c.env.DB.prepare("UPDATE publicaciones SET actividad_en = datetime('now') WHERE id = ?").bind(
+      publicacionId,
+    ),
+  ]);
+
+  return c.json({ ok: true }, 201);
+});
+
+rutas.delete('/comentarios/:id', async (c) => {
+  const { perfil, reto } = c.get('ctx');
+
+  const comentario = await c.env.DB.prepare(
+    `SELECT co.user_id AS user_id, p.reto_id AS reto_id
+       FROM comentarios co
+       JOIN publicaciones p ON p.id = co.publicacion_id
+      WHERE co.id = ?`,
+  )
+    .bind(c.req.param('id'))
+    .first<{ user_id: string; reto_id: string }>();
+
+  if (!comentario || comentario.reto_id !== reto.id) throw noEncontrado('Ese comentario no existe');
+  if (comentario.user_id !== perfil.id && perfil.es_admin !== 1) {
+    throw prohibido('Solo su autor o un administrador pueden borrarlo');
+  }
+
+  await c.env.DB.prepare('DELETE FROM comentarios WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ ok: true });
 });
 
 export default rutas;

@@ -105,8 +105,22 @@ app.all('*', async (c) => {
   const respuesta = await c.env.ASSETS.fetch(c.req.raw);
   if (respuesta.status !== 404) return respuesta;
 
-  // Rutas del cliente (/comunidad, /metas/xxx...) devuelven el index.
   const url = new URL(c.req.url);
+
+  /*
+   * El index solo se devuelve para NAVEGACIONES. Un archivo que no existe tiene
+   * que dar 404 de verdad.
+   *
+   * Sin esta distinción, pedir un /assets/index-abc.js inexistente devolvía el
+   * index.html con estado 200 y tipo text/html. El navegador lo aceptaba como
+   * módulo, fallaba al ejecutarlo, y la pantalla quedaba en blanco con un error
+   * que no señalaba a ninguna parte. Un 404 dice exactamente qué falta.
+   */
+  const pideArchivo = /\.[a-z0-9]+$/i.test(url.pathname);
+  const esNavegacion = (c.req.header('accept') ?? '').includes('text/html');
+  if (pideArchivo || !esNavegacion) return respuesta;
+
+  // Rutas del cliente (/comunidad, /metas/xxx...) devuelven el index.
   url.pathname = '/';
   return c.env.ASSETS.fetch(new Request(url.toString(), { headers: c.req.raw.headers }));
 });

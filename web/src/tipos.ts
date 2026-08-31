@@ -278,3 +278,34 @@ export interface Frase {
   texto: string;
   autor: string | null;
 }
+
+export interface Comentario {
+  id: string;
+  publicacion_id: string;
+  texto: string;
+  created_at: string;
+  user_id: string;
+  nombre: string;
+  foto_url: string | null;
+}
+
+export interface Publicacion {
+  id: string;
+  texto: string;
+  created_at: string;
+  actividad_en: string;
+  user_id: string;
+  nombre: string;
+  foto_url: string | null;
+  meta_id: string | null;
+  meta_titulo: string | null;
+  animos: number;
+  le_di_animo: boolean;
+  puedo_borrar: boolean;
+  comentarios: Comentario[];
+}
+
+export interface FeedPublicaciones {
+  soy_admin: boolean;
+  publicaciones: Publicacion[];
+}

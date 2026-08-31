@@ -12,6 +12,7 @@ import { api, ErrorApi } from '../lib/api';
 import { useCargar, Aviso, Avatar, Cargando, Etiqueta, Vacio } from '../componentes/basicos';
 import { haceCuanto } from '../lib/fechas';
 import { useSesion } from '../lib/sesion';
+import { Publicaciones } from '../componentes/Publicaciones';
 import type { Comunidad as DatosComunidad, EventoMuro } from '../tipos';
 
 function textoDelEvento(evento: EventoMuro): string {
@@ -31,6 +32,7 @@ export function Comunidad() {
   const { datos, cargando, error, recargar } = useCargar<DatosComunidad>('/comunidad');
   const { perfil, hoy, apareceEnRanking } = useSesion();
   const [fallo, setFallo] = useState<string | null>(null);
+  const [pestana, setPestana] = useState<'conversacion' | 'logros'>('conversacion');
 
   if (cargando) return <Cargando />;
   if (error || !datos) {
@@ -135,8 +137,36 @@ export function Comunidad() {
         )}
       </section>
 
+      {/*
+        Dos feeds distintos, separados a propósito:
+        - Conversación: lo escriben las personas, se comenta, y se ordena por
+          última actividad.
+        - Logros: lo escribe la app sola, es cronológico y solo positivo.
+        Mezclarlos volvería confuso qué dijo alguien y qué dedujo el sistema.
+      */}
+      <div className="pestanas" role="tablist">
+        <button
+          role="tab"
+          aria-selected={pestana === 'conversacion'}
+          className={pestana === 'conversacion' ? 'pestana activa' : 'pestana'}
+          onClick={() => setPestana('conversacion')}
+        >
+          Conversación
+        </button>
+        <button
+          role="tab"
+          aria-selected={pestana === 'logros'}
+          className={pestana === 'logros' ? 'pestana activa' : 'pestana'}
+          onClick={() => setPestana('logros')}
+        >
+          Logros
+        </button>
+      </div>
+
+      {pestana === 'conversacion' && <Publicaciones />}
+
       {/* --- muro de logros: solo eventos positivos --- */}
-      <section className="tarjeta">
+      <section className="tarjeta" hidden={pestana !== 'logros'}>
         <h2 style={{ marginBottom: 8 }}>Muro de logros</h2>
 
         {muro.length === 0 ? (

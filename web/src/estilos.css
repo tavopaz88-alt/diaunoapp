@@ -573,3 +573,73 @@ textarea {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------- pestañas */
+
+.pestanas {
+  display: flex;
+  gap: 4px;
+  background: var(--superficie-2);
+  border-radius: var(--radio-chico);
+  padding: 4px;
+}
+
+.pestana {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--texto-suave);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.pestana.activa {
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: var(--sombra);
+}
+
+/* -------------------------------------------------------- publicaciones */
+
+.publicacion {
+  border-bottom: 1px solid var(--borde);
+  padding: 16px 0;
+}
+
+.publicacion:last-child { border-bottom: none; }
+
+.publicacion-texto {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 6px;
+}
+
+.comentarios {
+  margin-top: 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--borde);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comentario-texto {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+}
+
+.borrar {
+  border: none;
+  background: none;
+  color: var(--texto-suave);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  min-height: 36px;
+  padding: 0 8px;
+}
+
+.borrar:hover { color: var(--peligro); }

@@ -74,6 +74,42 @@ visibilidad. Al bajarla, los eventos se retiran:
 
 Sin esto, poner una meta en privado no servía para nada retroactivamente.
 
+### Publicaciones: ordenadas por actividad, no por popularidad
+
+El muro de logros lo escribe la app sola. Faltaba que la gente pudiera contar cómo
+va con sus palabras, así que se agregaron **publicaciones y comentarios**, en una
+pestaña aparte del muro. Mezclarlos volvería confuso qué dijo una persona y qué
+dedujo el sistema.
+
+El pedido original era ordenar el feed **por interacciones**. No se hizo así, y la
+razón es la misma que sostiene el resto del producto: en un grupo de treinta, un
+feed ordenado por popularidad reconstruye exactamente lo que el ranking evita. La
+publicación con cero reacciones se hunde al fondo, y su autor lo ve. Es la misma
+persona que el corte en cinco protege, expuesta por otra puerta.
+
+Se ordena por **última actividad**: una publicación sube cuando recibe un
+comentario. Da el efecto útil que se buscaba —las conversaciones vivas quedan
+arriba— sin que el criterio sea cuánta atención recibió nadie.
+
+Moderación: cada quien borra lo suyo y un administrador puede borrar cualquier
+publicación o comentario. Es el mínimo que hace responsable el texto libre; sin
+eso, un mensaje desubicado no tiene remedio dentro de la app.
+
+Una publicación puede colgar de una meta propia, pero **nunca de una meta
+`privada`**: el título es justo lo que su dueño decidió reservar. La API lo
+rechaza, no solo el formulario.
+
+### El index.html solo se sirve en navegaciones
+
+El respaldo de SPA devolvía `index.html` para cualquier ruta que no existiera,
+incluidos los archivos estáticos. Un `/assets/index-abc.js` inexistente respondía
+HTML con estado 200; el navegador lo aceptaba como módulo, fallaba al ejecutarlo y
+la pantalla quedaba en blanco sin un error que señalara la causa.
+
+Ahora el index solo sale si la petición es una navegación (acepta `text/html` y no
+pide un archivo con extensión). Cualquier otra cosa que falte da 404 de verdad, que
+es lo que permite diagnosticarla.
+
 ### El resumen compartible avisa antes de exponer
 
 La imagen del resumen incluye las metas privadas: es el resumen propio y su dueño
