@@ -16,6 +16,8 @@
     "db:remoto": "npm run db:remoto --workspace api",
     "typecheck": "npm run typecheck --workspace api && npm run typecheck --workspace web",
     "cf:deploy": "wrangler deploy --config api/wrangler.toml",
-    "cf:migrar": "wrangler d1 migrations apply reto-metas --remote --config api/wrangler.toml"
+    "cf:migrar": "wrangler d1 migrations apply reto-metas --remote --config api/wrangler.toml",
+    "vaciar-local": "wrangler d1 execute reto-metas --local --file api/scripts/vaciar.sql --config api/wrangler.toml",
+    "cf:vaciar-todo": "wrangler d1 execute reto-metas --remote --file api/scripts/vaciar.sql --config api/wrangler.toml"
   }
 }

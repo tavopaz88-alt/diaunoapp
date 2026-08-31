@@ -243,6 +243,52 @@ npx wrangler d1 export reto-metas --remote --config api/wrangler.toml --output r
 
 ---
 
+## Empezar de cero después de probar
+
+Si estuviste probando con cuentas de mentira y querés que el reto real arranque
+limpio, esto vacía **todos** los datos y deja la app como recién instalada:
+
+```bash
+npm run cf:vaciar-todo
+```
+
+Borra las 10 tablas (perfiles, retos, metas, registros, eventos, ánimos, frases y
+tokens) y deja el esquema intacto, así que `/instalar` se vuelve a habilitar y
+podés crear el administrador y el reto de nuevo.
+
+**No hay vuelta atrás.** Si querés guardar lo que había antes:
+
+```bash
+npx wrangler d1 export reto-metas --remote --config api/wrangler.toml --output respaldo.sql
+```
+
+Lo que **no** borra:
+
+- **Los secretos del Worker.** `JWT_SECRET` y `SETUP_TOKEN` siguen valiendo, así
+  que para volver a instalar usás el mismo token de antes.
+- **Las fotos de perfil en R2.** Quedan huérfanas, ocupando unos kilobytes. La
+  forma limpia de barrerlas es rehacer el bucket:
+
+```bash
+npx wrangler r2 bucket delete reto-metas-fotos
+```
+
+```bash
+npx wrangler r2 bucket create reto-metas-fotos
+```
+
+Para vaciar la base **local** de desarrollo, que es otra distinta:
+
+```bash
+npm run vaciar-local
+```
+
+> Si en vez de vaciar preferís sacar solo a algunas personas, no hace falta nada
+> de esto: *Administración → Participantes → Sacar* los quita del reto y se
+> llevan sus metas y registros con ellos, sin tocar al resto.
+
+---
+
 ## Cosas que conviene saber
 
 **El costo de la contraseña en el plan gratuito.** El hash usa PBKDF2 con 100.000
