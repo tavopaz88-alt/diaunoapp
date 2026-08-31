@@ -3,7 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "description": "App de seguimiento de metas para retos de habitos de 30 dias",
-  "workspaces": ["api", "web"],
+  "workspaces": [
+    "api",
+    "web"
+  ],
   "scripts": {
     "dev": "npm run build --workspace web && npm run dev --workspace api",
     "dev:web": "npm run dev --workspace web",
@@ -11,6 +14,8 @@
     "deploy": "npm run build && npm run deploy --workspace api",
     "db:local": "npm run db:local --workspace api",
     "db:remoto": "npm run db:remoto --workspace api",
-    "typecheck": "npm run typecheck --workspace api && npm run typecheck --workspace web"
+    "typecheck": "npm run typecheck --workspace api && npm run typecheck --workspace web",
+    "cf:deploy": "wrangler deploy --config api/wrangler.toml",
+    "cf:migrar": "wrangler d1 migrations apply reto-metas --remote --config api/wrangler.toml"
   }
 }
