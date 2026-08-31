@@ -122,4 +122,5 @@ npm run typecheck
 
 ## Despliegue
 
-Ver [docs/despliegue.md](docs/despliegue.md).
+Ver [docs/despliegue.md](docs/despliegue.md). El repositorio esta conectado a
+Cloudflare Workers Builds: cada push a `main` compila y publica solo.

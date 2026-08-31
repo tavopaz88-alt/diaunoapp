@@ -1,13 +1,19 @@
 # Despliegue en Cloudflare
 
-De cero a la app corriendo en `reto.conectamierp.com`. Cada paso dice qué esperar,
-para que sepas si algo salió mal antes de seguir.
+De cero a la app corriendo en `reto.conectamierp.com`, desde el repositorio
+[tavopaz88-alt/diaunoapp](https://github.com/tavopaz88-alt/diaunoapp).
 
-Todo se ejecuta desde la raíz del proyecto salvo donde se indique.
+Cada paso dice qué esperar, para que sepas si algo salió mal antes de seguir.
+
+**El orden importa.** Los pasos 1 a 4 crean los recursos y hay que hacerlos una
+sola vez; recién después se conecta el repositorio, porque el despliegue falla si
+la base de datos todavía no existe.
 
 ---
 
 ## 1. Entrar a Cloudflare
+
+Desde la raíz del proyecto:
 
 ```bash
 npx wrangler login
@@ -39,10 +45,18 @@ database_id = "a1b2c3d4-...."
 **Copia ese `database_id` a `api/wrangler.toml`**, reemplazando
 `REEMPLAZAR_CON_EL_ID_REAL`. Sin esto el despliegue falla.
 
-Aplica el esquema a la base real:
+Guarda el cambio en el repositorio, porque Cloudflare desplegará desde ahí:
 
 ```bash
-npm run db:remoto
+git add api/wrangler.toml
+git commit -m "Apuntar al D1 real"
+git push
+```
+
+Aplica el esquema a la base:
+
+```bash
+npm run cf:migrar
 ```
 
 Debe listar `0001_esquema_inicial.sql` con estado ✅.
@@ -63,15 +77,63 @@ Si tu cuenta aún no tiene R2 activado, el panel te lo pedirá una vez.
 
 ---
 
-## 4. Configurar los secretos
+## 4. Ajustar las variables del reto
 
-Genera un `JWT_SECRET` largo y aleatorio:
+En `api/wrangler.toml`, bloque `[vars]`:
+
+```toml
+ZONA_HORARIA = "America/Guatemala"   # define de qué día se trata cada marca
+APP_URL      = "https://reto.conectamierp.com"
+EMAIL_FROM   = "Reto <reto@conectamierp.com>"
+EMAIL_ACTIVO = "false"               # se pone en "true" en el paso 8
+```
+
+`ZONA_HORARIA` no es cosmético: decide cuándo cambia el día para todo el grupo. No
+se deriva del teléfono de cada quien, a propósito.
+
+Commitea y sube el cambio.
+
+---
+
+## 5. Conectar el repositorio
+
+En el panel: **Workers & Pages → Create → Workers → Import a repository**, autoriza
+GitHub y elige `tavopaz88-alt/diaunoapp`.
+
+Configura la build así:
+
+| Campo | Valor |
+|---|---|
+| Project name | `reto-metas` |
+| Root directory | `/` (dejar vacío) |
+| Build command | `npm run build` |
+| Deploy command | `npm run cf:deploy` |
+| Branch | `main` |
+
+`npm run build` compila la SPA hacia `api/public`, y `npm run cf:deploy` publica el
+Worker con esos archivos adentro. Los dos comandos están en el `package.json` de la
+raíz, así que no hay nada más que configurar.
+
+A partir de aquí, **cada push a `main` despliega solo**.
+
+Si prefieres desplegar a mano desde tu máquina y no conectar el repositorio, el
+equivalente es un único comando y puedes saltarte este paso:
+
+```bash
+npm run deploy
+```
+
+---
+
+## 6. Cargar los secretos
+
+Los secretos **no** van en el repositorio. Cárgalos una vez:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Y cárgalo, junto con el token de instalación:
+Con esa cadena:
 
 ```bash
 cd api
@@ -84,53 +146,19 @@ npx wrangler secret put SETUP_TOKEN
 - `SETUP_TOKEN` es de un solo uso real: la instalación solo corre con la base
   vacía, así que después de instalar deja de servir para nada.
 
+También se pueden cargar desde el panel, en **Settings → Variables and Secrets**.
+
 El de correo (`RESEND_API_KEY`) se agrega en el paso 8.
-
----
-
-## 5. Ajustar las variables del reto
-
-En `api/wrangler.toml`, bloque `[vars]`:
-
-```toml
-ZONA_HORARIA = "America/Guatemala"   # define de qué día se trata cada marca
-APP_URL      = "https://reto.conectamierp.com"
-EMAIL_FROM   = "Reto <reto@conectamierp.com>"
-EMAIL_ACTIVO = "false"               # se pone en "true" en el paso 8
-```
-
-`ZONA_HORARIA` es importante: es la que decide cuándo cambia el día para todos.
-No la derives del teléfono de cada quien.
-
----
-
-## 6. Compilar y desplegar
-
-```bash
-npm run deploy
-```
-
-Compila la SPA hacia `api/public` y publica el Worker con la SPA incluida. Al
-terminar imprime una URL `https://reto-metas.<tu-subdominio>.workers.dev`.
-
-Ábrela: debe salir la pantalla de instalación.
 
 ---
 
 ## 7. Poner el dominio
 
-En el panel de Cloudflare: **Workers & Pages → reto-metas → Settings → Domains &
-Routes → Add → Custom domain**, y escribe `reto.conectamierp.com`.
+En el panel: **Workers & Pages → reto-metas → Settings → Domains & Routes → Add →
+Custom domain**, y escribe `reto.conectamierp.com`.
 
 Cloudflare crea el registro DNS solo, siempre que `conectamierp.com` ya esté en tu
 cuenta. El certificado tarda unos minutos.
-
-Cuando responda, vuelve a desplegar para que `APP_URL` (que usan los correos)
-apunte al dominio definitivo:
-
-```bash
-npm run deploy
-```
 
 ---
 
@@ -142,14 +170,14 @@ Sin esto la app funciona completa; solo no salen correos.
 2. Verifica el dominio `conectamierp.com` (te da unos registros DNS que agregas en
    Cloudflare). Sin dominio verificado, Resend solo deja enviarte a ti mismo.
 3. Genera una API key.
-4. Cárgala y activa el envío:
+4. Cárgala:
 
 ```bash
 cd api
 npx wrangler secret put RESEND_API_KEY
 ```
 
-En `api/wrangler.toml` pon `EMAIL_ACTIVO = "true"` y vuelve a desplegar.
+En `api/wrangler.toml` pon `EMAIL_ACTIVO = "true"`, commitea y sube.
 
 El Cron Trigger ya está configurado en `[triggers]`:
 
@@ -175,7 +203,7 @@ curl "http://localhost:8787/__scheduled?cron=0+12+*+*+*"
 
 Entra a `https://reto.conectamierp.com/instalar` y llena:
 
-- el `SETUP_TOKEN` del paso 4
+- el `SETUP_TOKEN` del paso 6
 - tu nombre, correo y contraseña (quedas como administrador)
 - nombre del reto, fecha de arranque y duración
 
@@ -196,22 +224,21 @@ Un segundo intento de `/instalar` debe responder «La aplicación ya está insta
 ## Operación diaria
 
 ```bash
-npm run deploy                       # publicar cambios
+git push                             # despliega solo, si conectaste el repo
 cd api && npx wrangler tail          # ver logs en vivo
 ```
 
 Consultar la base:
 
 ```bash
-cd api
-npx wrangler d1 execute reto-metas --remote --command "SELECT COUNT(*) FROM participaciones"
+npx wrangler d1 execute reto-metas --remote --config api/wrangler.toml \
+  --command "SELECT COUNT(*) FROM participaciones"
 ```
 
 Respaldo:
 
 ```bash
-cd api
-npx wrangler d1 export reto-metas --remote --output respaldo.sql
+npx wrangler d1 export reto-metas --remote --config api/wrangler.toml --output respaldo.sql
 ```
 
 ---
@@ -234,9 +261,6 @@ reto de 30 personas por 30 días son unas pocas miles de filas: no se acerca.
 **Sin límite de intentos de login.** No hay bloqueo por fuerza bruta. Para un reto
 por invitación es aceptable; si el registro se abriera, conviene poner Cloudflare
 Rate Limiting sobre `/api/login` desde el panel, que no requiere tocar el código.
-
-**El `ZONA_HORARIA` no es cosmético.** Define qué día es «hoy» para todos. Si el
-grupo está repartido en varios husos, todos comparten el día del reto, no el suyo.
 
 **Retos siguientes.** Al terminar los 30 días, *Administración* permite abrir otro
 reto y arrastrar a los participantes. El anterior queda archivado e intacto para su
