@@ -106,17 +106,21 @@ app.all('*', async (c) => {
   const url = new URL(c.req.url);
 
   /*
-   * El index solo se devuelve para NAVEGACIONES. Un archivo que no existe tiene
-   * que dar 404 de verdad.
+   * Lo que decide es si la ruta PIDE UN ARCHIVO, no quién pregunta.
    *
-   * Sin esta distinción, pedir un /assets/index-abc.js inexistente devolvía el
-   * index.html con estado 200 y tipo text/html. El navegador lo aceptaba como
-   * módulo, fallaba al ejecutarlo, y la pantalla quedaba en blanco con un error
-   * que no señalaba a ninguna parte. Un 404 dice exactamente qué falta.
+   * Un archivo que no existe da 404 de verdad: sin eso, pedir un
+   * /assets/index-abc.js inexistente devolvía el index.html con estado 200 y
+   * tipo text/html, el navegador lo aceptaba como módulo, fallaba al ejecutarlo
+   * y la pantalla quedaba en blanco sin un error que señalara la causa.
+   *
+   * Lo demás es una ruta del cliente y devuelve el index.
+   *
+   * Antes esto miraba además la cabecera Accept, y ahí estaba el error: solo los
+   * navegadores mandan `Accept: text/html`. Los previsualizadores de enlaces de
+   * WhatsApp y Slack no, así que recibían 404 y el enlace de invitación se veía
+   * roto justo donde se comparte.
    */
-  const pideArchivo = /\.[a-z0-9]+$/i.test(url.pathname);
-  const esNavegacion = (c.req.header('accept') ?? '').includes('text/html');
-  if (pideArchivo || !esNavegacion) return respuesta;
+  if (/\.[a-z0-9]+$/i.test(url.pathname)) return respuesta;
 
   // Rutas del cliente (/comunidad, /metas/xxx...) devuelven el index.
   url.pathname = '/';
