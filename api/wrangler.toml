@@ -2,6 +2,13 @@ name = "reto-metas"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 
+# Dominio propio, declarado aqui y no a mano en el panel: asi vive en el repo y
+# se vuelve a aplicar en cada despliegue.
+#
+# Con custom_domain, wrangler crea el registro DNS y pide el certificado solo.
+# Toca UNICAMENTE el subdominio; la raiz conectamierp.com no se modifica.
+routes = [{ pattern = "reto.conectamierp.com", custom_domain = true }]
+
 # El mismo Worker sirve la API (/api/*) y la SPA compilada.
 # Un solo dominio => sin CORS y un solo despliegue.
 [assets]
