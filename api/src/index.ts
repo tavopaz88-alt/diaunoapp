@@ -6,7 +6,6 @@
  */
 
 import { Hono } from 'hono';
-import type { MiddlewareHandler } from 'hono';
 import type { Enlaces } from './rutas/base';
 import rutasAutenticacion from './rutas/autenticacion';
 import rutasPerfil from './rutas/perfil';
@@ -25,18 +24,6 @@ const app = new Hono<Enlaces>();
 const api = new Hono<Enlaces>();
 
 // ---------------------------------------------------------------- seguridad
-
-/** Exige sesion valida y deja el perfil en el contexto. */
-const conSesion: MiddlewareHandler<Enlaces> = async (c, next) => {
-  c.set('perfil', await perfilDe(c.req.raw, c.env));
-  await next();
-};
-
-/** Ademas exige reto activo e inscripcion. */
-const conReto: MiddlewareHandler<Enlaces> = async (c, next) => {
-  c.set('ctx', await contextoDe(c.get('perfil'), c.env));
-  await next();
-};
 
 /**
  * Defensa CSRF sencilla: la cookie es SameSite=Lax, que ya bloquea el envio en
@@ -57,35 +44,46 @@ api.use('*', async (c, next) => {
   await next();
 });
 
-// -------------------------------------------------------------- rutas publicas
-// /api/estado /api/setup /api/registro /api/login /api/salir /api/yo
-// /api/recuperar /api/restablecer
-api.route('/', rutasAutenticacion);
+/*
+ * ACCESO: se deniega por defecto.
+ *
+ * Antes habia una lista de rutas protegidas, y agregar una ruta nueva sin
+ * acordarse de anotarla la dejaba fuera del control de sesion. Paso de verdad
+ * con /dias/limpiar-detalle: la lista tenia '/dias' pero no '/dias/*'.
+ *
+ * Ahora la lista es la de rutas PUBLICAS. Olvidarse de anotar una ruta nueva la
+ * deja mas cerrada, no mas abierta, que es el lado correcto para equivocarse.
+ */
+const PUBLICAS = new Set([
+  '/estado',
+  '/setup',
+  '/registro',
+  '/login',
+  '/salir',
+  '/recuperar',
+  '/restablecer',
+  '/yo', // resuelve la sesion por su cuenta y responde 401 si no hay
+]);
 
-// ------------------------------------------------------- requieren sesion
-api.use('/perfil', conSesion);
-api.use('/perfil/*', conSesion);
-api.use('/media/*', conSesion);
+/** Necesitan sesion pero NO un reto activo: el perfil y sus archivos. */
+const SIN_RETO = [/^\/perfil(\/|$)/, /^\/media\//];
+
+api.use('*', async (c, next) => {
+  const ruta = new URL(c.req.url).pathname.replace(/^\/api/, '') || '/';
+  if (PUBLICAS.has(ruta)) return next();
+
+  c.set('perfil', await perfilDe(c.req.raw, c.env));
+  if (!SIN_RETO.some((patron) => patron.test(ruta))) {
+    c.set('ctx', await contextoDe(c.get('perfil'), c.env));
+  }
+  await next();
+});
+
+// /estado /setup /registro /login /salir /yo /recuperar /restablecer
+api.route('/', rutasAutenticacion);
 
 api.route('/perfil', rutasPerfil);
 api.route('/media', rutasMedia);
-
-// --------------------------------------------- requieren sesion + reto activo
-for (const patron of [
-  '/metas',
-  '/metas/*',
-  '/hoy',
-  '/dias',
-  '/semanas',
-  '/comunidad',
-  '/comunidad/*',
-  '/animos',
-  '/admin',
-  '/admin/*',
-  '/resumen',
-]) {
-  api.use(patron, conSesion, conReto);
-}
 
 api.route('/metas', rutasMetas);
 api.route('/', rutasRegistros); // /hoy /dias /semanas
