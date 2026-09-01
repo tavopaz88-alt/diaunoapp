@@ -9,8 +9,22 @@
  */
 
 import { crearRuta, datosDelReto } from './base';
-import { diasCumplidosPorUsuario, diasPorMeta, metasDe, participantesDe, semanalesDe } from '../lib/consultas';
-import { calcularConstancia, rachaMaxima, resultadoDeMeta, ventanaDe } from '../lib/metricas';
+import {
+  cantidadesDe,
+  detalleDiarioDe,
+  diasCumplidosPorUsuario,
+  diasPorMeta,
+  metasDe,
+  participantesDe,
+  semanalesDe,
+} from '../lib/consultas';
+import {
+  calcularConstancia,
+  rachaMaxima,
+  resultadoDeMeta,
+  sumarPorSemana,
+  ventanaDe,
+} from '../lib/metricas';
 import { fechaFinReto } from '../lib/fechas';
 
 const rutas = crearRuta();
@@ -23,6 +37,7 @@ rutas.get('/', async (c) => {
   const metas = await metasDe(c.env, reto.id, perfil.id);
   const semanales = await semanalesDe(c.env, metas.map((m) => m.id));
   const porMeta = await diasPorMeta(c.env, reto.id, perfil.id);
+  const detalleDiario = await detalleDiarioDe(c.env, reto.id, perfil.id);
 
   const todos = new Set<string>();
   for (const dias of porMeta.values()) for (const d of dias) todos.add(d);
@@ -45,7 +60,13 @@ rutas.get('/', async (c) => {
         porcentaje: Math.round((cumplidos / ventana.dias) * 100),
         racha_maxima: rachaMaxima(dias),
       },
-      resultado: resultadoDeMeta(meta, semanales.get(meta.id) ?? [], dias, ventana),
+      resultado: resultadoDeMeta(
+        meta,
+        semanales.get(meta.id) ?? [],
+        dias,
+        ventana,
+        sumarPorSemana(cantidadesDe(detalleDiario.get(meta.id))),
+      ),
     };
   });
 

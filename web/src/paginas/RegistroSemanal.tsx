@@ -12,7 +12,7 @@ import type { DatosSemanas, MetaSemanal, Semana } from '../tipos';
 function etiquetaDelCampo(meta: MetaSemanal): string {
   switch (meta.tipo) {
     case 'acumulativo':
-      return `Cuantas ${meta.unidad} esta semana`;
+      return `Cuántas ${meta.unidad} esta semana`;
     case 'medicion':
       return `Valor actual en ${meta.unidad}`;
     default:
@@ -120,6 +120,33 @@ export function RegistroSemanal() {
           const valor =
             valores[campo] ??
             (existente ? String(existente.texto ?? existente.valor ?? '') : '');
+
+          /*
+           * Si esta semana ya tiene cargas diarias, su total sale de ahí y no se
+           * vuelve a pedir: pedirlo otra vez sería cargar lo mismo dos veces.
+           */
+          const delDiario = meta.desde_diario[clave];
+
+          if (delDiario !== undefined) {
+            return (
+              <section key={meta.id} className="tarjeta pila">
+                <div className="fila-entre">
+                  <h2 className="crece">{meta.titulo}</h2>
+                  <Etiqueta variante="acento">calculada</Etiqueta>
+                </div>
+                <div className="tarjeta-plana">
+                  <p className="mini">Total de la semana</p>
+                  <p className="numerote" style={{ fontSize: '1.75rem' }}>
+                    {delDiario} {meta.unidad}
+                  </p>
+                </div>
+                <p className="pista">
+                  Sale de lo que anotaste día por día en la pantalla de Hoy. Si querés cambiarlo,
+                  editá los días.
+                </p>
+              </section>
+            );
+          }
 
           return (
             <section key={meta.id} className="tarjeta pila">

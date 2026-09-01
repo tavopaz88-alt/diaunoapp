@@ -129,6 +129,30 @@ menos de diez segundos. Manda el criterio: las casillas van arriba, antes de la
 frase, los ánimos y la cuadrícula. Además el toque es optimista, la casilla responde
 antes que la red, y si falla se revierte.
 
+### Detalle diario opcional, sin tocar la constancia
+
+El spec hizo la capa diaria universal —la misma pregunta sí/no para todos los
+tipos— por dos razones: se llena en segundos, y es lo único comparable entre
+personas. Las dos siguen en pie.
+
+Encima de eso se agregó detalle **opcional**: cuánto hiciste (solo acumulativas)
+y qué hiciste (cualquier tipo). Vive detrás de un botón aparte, así que el toque
+para marcar el día sigue siendo un toque sobre casi toda la fila.
+
+**El detalle no entra en la constancia.** Esa se calcula solo con la marca de
+cumplido, para que siga siendo comparable sin importar quién anota más. Quien no
+anota nada no queda peor medido.
+
+Las acumulativas ganan además un **objetivo por día** opcional: sirve para
+mostrar "5 de 20 km" al anotar, pero el avance de la meta lo sigue marcando el
+objetivo total. Anotar menos del objetivo diario no es un fracaso: suma igual.
+
+**Regla del choque diario/semanal.** Si una semana tiene cargas diarias, su total
+sale de la suma de esos días y el registro semanal de esa semana se muestra
+calculado, sin pedirlo de nuevo. Si no tiene cargas diarias, se sigue cargando a
+mano. Sin esta regla, quien anotara los kilómetros día por día y además llenara
+el resumen semanal contaría lo mismo dos veces.
+
 ### El límite de 3 metas se volvió una sugerencia
 
 El spec proponía un máximo de 3 metas activas para forzar foco. Ya no se impone:

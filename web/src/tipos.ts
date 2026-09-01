@@ -64,6 +64,17 @@ export type Resultado =
   | ResultadoMedicion
   | ResultadoHito;
 
+export interface DetalleDia {
+  cumplido: boolean;
+  /** Unidades hechas ese día. Solo en acumulativas. */
+  cantidad: number | null;
+  /** Qué se hizo ese día, en palabras del usuario. */
+  nota: string | null;
+}
+
+/** Detalle indexado por fecha (YYYY-MM-DD). */
+export type DetallePorFecha = Record<string, DetalleDia>;
+
 export interface Meta {
   id: string;
   titulo: string;
@@ -74,6 +85,8 @@ export interface Meta {
   valor_inicial: number | null;
   valor_objetivo: number | null;
   direccion: Direccion | null;
+  /** Solo acumulativas: cuánto se propone hacer por día. */
+  objetivo_diario: number | null;
   archivada: boolean;
   completada_en: string | null;
   resultado: Resultado;
@@ -85,8 +98,10 @@ export interface MetaDeHoy {
   tipo: TipoMeta;
   visibilidad: Visibilidad;
   unidad: string | null;
+  objetivo_diario: number | null;
   cumplido_hoy: boolean;
   dias_cumplidos: string[];
+  detalle: DetallePorFecha;
   resultado: Resultado;
 }
 
@@ -211,6 +226,8 @@ export interface MetaSemanal {
   valor_objetivo: number | null;
   direccion: Direccion | null;
   registros: RegistroSemanal[];
+  /** Semanas cuyo total ya sale de las cargas diarias: no se vuelven a pedir. */
+  desde_diario: Record<string, number>;
 }
 
 export interface DatosSemanas {
@@ -223,6 +240,7 @@ export interface DetalleMeta {
   meta: Meta;
   resultado: Resultado;
   dias_cumplidos: string[];
+  detalle: DetallePorFecha;
   semanales: RegistroSemanal[];
   semanas: Semana[];
 }

@@ -10,9 +10,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ErrorApi } from '../lib/api';
-import { useCargar, Aviso, Avatar, Cargando, Etiqueta, Palomita } from '../componentes/basicos';
+import { useCargar, Aviso, Avatar, Cargando, Etiqueta } from '../componentes/basicos';
 import { Cuadricula } from '../componentes/Cuadricula';
-import { ResumenCorto } from '../componentes/visualizaciones';
+import { MetaDelDia } from '../componentes/MetaDelDia';
 import { diaYNumero, diasEntre, plural, rangoSemana, sumarDias } from '../lib/fechas';
 import type { Hoy as DatosHoy } from '../tipos';
 
@@ -68,6 +68,28 @@ export function Hoy() {
     }
   }
 
+  /** Guarda el detalle del día y recarga, para que el avance quede al día. */
+  async function guardarDetalle(metaId: string, campos: { cantidad?: number; nota?: string }) {
+    setFallo(null);
+    try {
+      await api.crear('/dias', { meta_id: metaId, fecha, ...campos });
+      await recargar();
+    } catch (e) {
+      setFallo(e instanceof ErrorApi ? e.message : 'No se pudo guardar el detalle');
+    }
+  }
+
+  /** Quita el detalle sin desmarcar el día: son dos cosas distintas. */
+  async function borrarDetalle(metaId: string) {
+    setFallo(null);
+    try {
+      await api.crear('/dias/limpiar-detalle', { meta_id: metaId, fecha });
+      await recargar();
+    } catch (e) {
+      setFallo(e instanceof ErrorApi ? e.message : 'No se pudo quitar el detalle');
+    }
+  }
+
   const pendientes = datos.semanales_pendientes;
 
   return (
@@ -120,26 +142,18 @@ export function Hoy() {
             </div>
           )}
 
-          {datos.metas.map((meta) => {
-            const cumplida = meta.dias_cumplidos.includes(fecha);
-            return (
-              <button
-                key={meta.id}
-                className={cumplida ? 'marca cumplida' : 'marca'}
-                onClick={() => void alternar(meta.id, cumplida)}
-                aria-pressed={cumplida}
-              >
-                <span className="marca-caja" aria-hidden="true">
-                  <Palomita />
-                </span>
-                {/* El titulo es de bloque y envuelve solo: el <br/> sobraba y abria un hueco. */}
-                <span className="crece">
-                  <span className="marca-titulo">{meta.titulo}</span>
-                  <ResumenCorto resultado={meta.resultado} />
-                </span>
-              </button>
-            );
-          })}
+          {datos.metas.map((meta) => (
+            <MetaDelDia
+              key={meta.id}
+              meta={meta}
+              fecha={fecha}
+              cumplida={meta.dias_cumplidos.includes(fecha)}
+              detalle={meta.detalle[fecha]}
+              onAlternar={() => void alternar(meta.id, meta.dias_cumplidos.includes(fecha))}
+              onGuardarDetalle={(campos) => guardarDetalle(meta.id, campos)}
+              onBorrarDetalle={() => borrarDetalle(meta.id)}
+            />
+          ))}
 
           {fecha !== datos.hoy && (
             <p className="mini">
@@ -169,7 +183,7 @@ export function Hoy() {
                   pendientes[0]?.semana_inicio ?? '',
                   pendientes[0]?.semana_fin ?? '',
                 )}.`
-              : `Tenes ${pendientes.length} registros semanales sin llenar.`}
+              : `Tenés ${pendientes.length} registros semanales sin llenar.`}
           </p>
         </Link>
       )}

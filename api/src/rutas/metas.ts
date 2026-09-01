@@ -6,8 +6,15 @@
  */
 
 import { crearRuta } from './base';
-import { diasPorMeta, metaPorId, metasDe, semanalesDe } from '../lib/consultas';
-import { resultadoDeMeta, ventanaDe } from '../lib/metricas';
+import {
+  cantidadesDe,
+  detalleDiarioDe,
+  diasPorMeta,
+  metaPorId,
+  metasDe,
+  semanalesDe,
+} from '../lib/consultas';
+import { resultadoDeMeta, sumarPorSemana, ventanaDe } from '../lib/metricas';
 import { revisarLogros } from '../lib/eventos';
 import { nuevoId } from '../lib/ids';
 import { semanasDelReto } from '../lib/fechas';
@@ -46,13 +53,21 @@ interface Configuracion {
   valor_inicial: number | null;
   valor_objetivo: number | null;
   direccion: Direccion | null;
+  /** Solo acumulativas: cuanto se propone hacer por dia. Opcional. */
+  objetivo_diario: number | null;
 }
 
 /** Configuracion obligatoria y coherente segun el tipo. */
 function configurarPorTipo(tipo: TipoMeta, datos: Record<string, unknown>): Configuracion {
   if (tipo === 'habito' || tipo === 'hito') {
     // Estos tipos no llevan numeros: se ignora lo que venga de mas.
-    return { unidad: null, valor_inicial: null, valor_objetivo: null, direccion: null };
+    return {
+      unidad: null,
+      valor_inicial: null,
+      valor_objetivo: null,
+      direccion: null,
+      objetivo_diario: null,
+    };
   }
 
   const unidad = textoRequerido(datos, 'unidad', { max: 24 });
@@ -62,7 +77,17 @@ function configurarPorTipo(tipo: TipoMeta, datos: Record<string, unknown>): Conf
     if (objetivo === null || objetivo <= 0) {
       throw malaPeticion('Una meta acumulativa necesita un objetivo total mayor que cero');
     }
-    return { unidad, valor_inicial: null, valor_objetivo: objetivo, direccion: null };
+    const porDia = numeroOpcional(datos, 'objetivo_diario');
+    if (porDia !== null && porDia <= 0) {
+      throw malaPeticion('El objetivo por dia tiene que ser mayor que cero');
+    }
+    return {
+      unidad,
+      valor_inicial: null,
+      valor_objetivo: objetivo,
+      direccion: null,
+      objetivo_diario: porDia,
+    };
   }
 
   const inicial = numeroOpcional(datos, 'valor_inicial');
@@ -84,7 +109,7 @@ function configurarPorTipo(tipo: TipoMeta, datos: Record<string, unknown>): Conf
     throw malaPeticion('Si la direccion es "subir", el objetivo debe ser mayor que el valor inicial');
   }
 
-  return { unidad, valor_inicial: inicial, valor_objetivo: objetivo, direccion };
+  return { unidad, valor_inicial: inicial, valor_objetivo: objetivo, direccion, objetivo_diario: null };
 }
 
 /** Mis metas con su avance. */
@@ -95,6 +120,7 @@ rutas.get('/', async (c) => {
   const metas = await metasDe(c.env, reto.id, perfil.id);
   const semanales = await semanalesDe(c.env, metas.map((m) => m.id));
   const diarios = await diasPorMeta(c.env, reto.id, perfil.id);
+  const detalle = await detalleDiarioDe(c.env, reto.id, perfil.id);
   const ventana = ventanaDe(reto, participacion.fecha_ingreso, zona);
 
   return c.json({
@@ -108,6 +134,7 @@ rutas.get('/', async (c) => {
         semanales.get(meta.id) ?? [],
         diarios.get(meta.id) ?? new Set(),
         ventana,
+        sumarPorSemana(cantidadesDe(detalle.get(meta.id))),
       ),
     })),
   });
@@ -134,8 +161,8 @@ rutas.post('/', async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO metas
        (id, user_id, reto_id, titulo, descripcion, tipo, visibilidad,
-        unidad, valor_inicial, valor_objetivo, direccion, orden)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        unidad, valor_inicial, valor_objetivo, direccion, objetivo_diario, orden)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -149,6 +176,7 @@ rutas.post('/', async (c) => {
       config.valor_inicial,
       config.valor_objetivo,
       config.direccion,
+      config.objetivo_diario,
       activas?.n ?? 0,
     )
     .run();
@@ -166,11 +194,19 @@ rutas.get('/:id', async (c) => {
 
   const semanales = (await semanalesDe(c.env, [meta.id])).get(meta.id) ?? [];
   const dias = (await diasPorMeta(c.env, reto.id, perfil.id)).get(meta.id) ?? new Set<string>();
+  const detalleMeta = (await detalleDiarioDe(c.env, reto.id, perfil.id)).get(meta.id);
   const ventana = ventanaDe(reto, participacion.fecha_ingreso, c.env.ZONA_HORARIA);
 
   return c.json({
     meta: { ...meta, archivada: meta.archivada === 1 },
-    resultado: resultadoDeMeta(meta, semanales, dias, ventana),
+    resultado: resultadoDeMeta(
+      meta,
+      semanales,
+      dias,
+      ventana,
+      sumarPorSemana(cantidadesDe(detalleMeta)),
+    ),
+    detalle: Object.fromEntries(detalleMeta ?? []),
     dias_cumplidos: [...dias].sort(),
     semanales,
     semanas: semanasDelReto(reto),
@@ -205,7 +241,13 @@ rutas.patch('/:id', async (c) => {
   const archivada = datos.archivada === undefined ? meta.archivada === 1 : booleano(datos, 'archivada', false);
 
   // La configuracion solo se revalida si viene alguno de sus campos.
-  const tocaConfig = ['unidad', 'valor_inicial', 'valor_objetivo', 'direccion'].some(
+  const tocaConfig = [
+    'unidad',
+    'valor_inicial',
+    'valor_objetivo',
+    'direccion',
+    'objetivo_diario',
+  ].some(
     (campo) => datos[campo] !== undefined,
   );
   const config = tocaConfig
@@ -214,18 +256,21 @@ rutas.patch('/:id', async (c) => {
         valor_inicial: datos.valor_inicial ?? meta.valor_inicial,
         valor_objetivo: datos.valor_objetivo ?? meta.valor_objetivo,
         direccion: datos.direccion ?? meta.direccion,
+        objetivo_diario: datos.objetivo_diario ?? meta.objetivo_diario,
       })
     : {
         unidad: meta.unidad,
         valor_inicial: meta.valor_inicial,
         valor_objetivo: meta.valor_objetivo,
         direccion: meta.direccion,
+        objetivo_diario: meta.objetivo_diario,
       };
 
   await c.env.DB.prepare(
     `UPDATE metas
         SET titulo = ?, descripcion = ?, visibilidad = ?, archivada = ?,
-            unidad = ?, valor_inicial = ?, valor_objetivo = ?, direccion = ?
+            unidad = ?, valor_inicial = ?, valor_objetivo = ?, direccion = ?,
+            objetivo_diario = ?
       WHERE id = ?`,
   )
     .bind(
@@ -237,6 +282,7 @@ rutas.patch('/:id', async (c) => {
       config.valor_inicial,
       config.valor_objetivo,
       config.direccion,
+      config.objetivo_diario,
       meta.id,
     )
     .run();

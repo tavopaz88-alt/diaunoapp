@@ -66,6 +66,8 @@ export interface Meta {
   valor_inicial: number | null;
   valor_objetivo: number | null;
   direccion: Direccion | null;
+  /** Objetivo por dia, opcional y solo en acumulativas: "20 km diarios". */
+  objetivo_diario: number | null;
   orden: number;
   archivada: number;
   completada_en: string | null;
@@ -77,6 +79,10 @@ export interface RegistroDiario {
   meta_id: string;
   fecha: string;
   cumplido: number;
+  /** Unidades hechas ese dia. Solo en acumulativas. */
+  cantidad: number | null;
+  /** Que se hizo ese dia, en palabras del usuario. Cualquier tipo. */
+  nota: string | null;
   created_at: string;
 }
 

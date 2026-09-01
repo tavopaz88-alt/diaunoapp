@@ -70,6 +70,7 @@ export function MetaFormulario() {
   const [unidad, setUnidad] = useState('');
   const [valorInicial, setValorInicial] = useState('');
   const [valorObjetivo, setValorObjetivo] = useState('');
+  const [objetivoDiario, setObjetivoDiario] = useState('');
   const [direccion, setDireccion] = useState<Direccion>('bajar');
 
   const { ocupado, error, enviar } = useEnvio();
@@ -84,6 +85,7 @@ export function MetaFormulario() {
     setUnidad(m.unidad ?? '');
     setValorInicial(m.valor_inicial === null ? '' : String(m.valor_inicial));
     setValorObjetivo(m.valor_objetivo === null ? '' : String(m.valor_objetivo));
+    setObjetivoDiario(m.objetivo_diario === null ? '' : String(m.objetivo_diario));
     setDireccion(m.direccion ?? 'bajar');
   }, [detalle]);
 
@@ -94,6 +96,7 @@ export function MetaFormulario() {
     if (tipo === 'acumulativo') {
       base.unidad = unidad;
       base.valor_objetivo = Number(valorObjetivo);
+      base.objetivo_diario = objetivoDiario.trim() === '' ? null : Number(objetivoDiario);
     }
     if (tipo === 'medicion') {
       base.unidad = unidad;
@@ -209,6 +212,23 @@ export function MetaFormulario() {
                 value={valorObjetivo}
                 onChange={(e) => setValorObjetivo(e.target.value)}
               />
+            </div>
+            <div className="campo">
+              <label htmlFor="objetivo-diario">Objetivo por día (opcional)</label>
+              <input
+                id="objetivo-diario"
+                type="number"
+                inputMode="decimal"
+                min={0.01}
+                step="any"
+                placeholder="20"
+                value={objetivoDiario}
+                onChange={(e) => setObjetivoDiario(e.target.value)}
+              />
+              <span className="pista">
+                Solo sirve de referencia al anotar el día: verás "5 de 20". El avance de la meta
+                lo marca el objetivo total, no este.
+              </span>
             </div>
           </div>
         )}

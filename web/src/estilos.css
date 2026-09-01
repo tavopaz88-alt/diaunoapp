@@ -656,3 +656,43 @@ textarea {
 }
 
 .borrar:hover { color: var(--peligro); }
+
+/* --- fila de meta del dia: area grande para marcar + boton de detalle --- */
+
+.marca-principal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  /* Toda la altura de la fila, para que el area tocable no se achique. */
+  align-self: stretch;
+}
+
+.marca-mas {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radio-chico);
+  border: 1px solid var(--borde);
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.marca-mas.con-detalle {
+  border-color: var(--acento);
+  color: var(--acento);
+}
+
+.marca.cumplida .marca-mas {
+  border-color: color-mix(in srgb, var(--acento) 45%, transparent);
+}

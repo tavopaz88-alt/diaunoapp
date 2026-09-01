@@ -112,6 +112,52 @@ export async function diasPorMeta(
   return mapa;
 }
 
+export interface DetalleDia {
+  cumplido: boolean;
+  cantidad: number | null;
+  nota: string | null;
+}
+
+/**
+ * Detalle de cada dia registrado, por meta.
+ *
+ * Va aparte de `diasPorMeta` a proposito: la constancia se calcula solo con el
+ * conjunto de fechas cumplidas y no debe depender de si alguien anoto detalle.
+ */
+export async function detalleDiarioDe(
+  env: Env,
+  retoId: string,
+  userId: string,
+): Promise<Map<string, Map<string, DetalleDia>>> {
+  const { results } = await env.DB.prepare(
+    `SELECT d.meta_id AS meta_id, d.fecha AS fecha, d.cumplido AS cumplido,
+            d.cantidad AS cantidad, d.nota AS nota
+       FROM registros_diarios d
+       JOIN metas m ON m.id = d.meta_id
+      WHERE m.reto_id = ? AND m.user_id = ?`,
+  )
+    .bind(retoId, userId)
+    .all<{
+      meta_id: string;
+      fecha: string;
+      cumplido: number;
+      cantidad: number | null;
+      nota: string | null;
+    }>();
+
+  const mapa = new Map<string, Map<string, DetalleDia>>();
+  for (const fila of results ?? []) {
+    let porFecha = mapa.get(fila.meta_id);
+    if (!porFecha) mapa.set(fila.meta_id, (porFecha = new Map()));
+    porFecha.set(fila.fecha, {
+      cumplido: fila.cumplido === 1,
+      cantidad: fila.cantidad,
+      nota: fila.nota,
+    });
+  }
+  return mapa;
+}
+
 export async function semanalesDe(env: Env, metaIds: string[]): Promise<Map<string, RegistroSemanal[]>> {
   const mapa = new Map<string, RegistroSemanal[]>();
   if (metaIds.length === 0) return mapa;
@@ -159,4 +205,13 @@ export async function participantesDe(env: Env, retoId: string): Promise<Partici
     .bind(retoId)
     .all<ParticipanteBasico>();
   return results ?? [];
+}
+
+/** Extrae solo las cantidades cargadas, listas para agrupar por semana. */
+export function cantidadesDe(detalle: Map<string, DetalleDia> | undefined): Map<string, number> {
+  const cantidades = new Map<string, number>();
+  for (const [fecha, dia] of detalle ?? []) {
+    if (dia.cantidad !== null) cantidades.set(fecha, dia.cantidad);
+  }
+  return cantidades;
 }

@@ -14,6 +14,8 @@
 import { crearRuta } from './base';
 import {
   diasCumplidosPorUsuario,
+  cantidadesDe,
+  detalleDiarioDe,
   diasPorMeta,
   metasDe,
   participacionDe,
@@ -21,7 +23,7 @@ import {
   perfilPorId,
   semanalesDe,
 } from '../lib/consultas';
-import { calcularConstancia, resultadoDeMeta, ventanaDe } from '../lib/metricas';
+import { calcularConstancia, resultadoDeMeta, sumarPorSemana, ventanaDe } from '../lib/metricas';
 import { proyectarMeta, veValores, nivelSobreMeta } from '../lib/visibilidad';
 import { nuevoId } from '../lib/ids';
 import {
@@ -162,6 +164,7 @@ rutas.get('/perfil/:userId', async (c) => {
 
   const semanales = await semanalesDe(c.env, visibles.map((x) => x.meta.id));
   const diariosPorMeta = await diasPorMeta(c.env, reto.id, objetivoId);
+  const detallePorMeta = await detalleDiarioDe(c.env, reto.id, objetivoId);
 
   return c.json({
     perfil: {
@@ -182,7 +185,13 @@ rutas.get('/perfil/:userId', async (c) => {
         // Con nivel `titulo` se ve si cumplio cada dia, pero no los valores.
         dias_cumplidos: [...diasMeta].sort(),
         resultado: detalle
-          ? resultadoDeMeta(meta, semanales.get(meta.id) ?? [], diasMeta, ventana)
+          ? resultadoDeMeta(
+              meta,
+              semanales.get(meta.id) ?? [],
+              diasMeta,
+              ventana,
+              sumarPorSemana(cantidadesDe(detallePorMeta.get(meta.id))),
+            )
           : null,
       };
     }),

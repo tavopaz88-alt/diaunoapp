@@ -6,7 +6,7 @@
  * mezclaria las dos cosas y no diria nada util.
  */
 
-import { diasEntre, hoyDentroDelReto, maxFecha, sumarDias } from './fechas';
+import { diasEntre, hoyDentroDelReto, lunesDe, maxFecha, sumarDias } from './fechas';
 import type { Meta, RegistroSemanal, Reto } from '../tipos';
 
 /** Dias que le "cuentan" a alguien: desde que se unio hasta hoy, dentro del reto. */
@@ -131,15 +131,31 @@ function acotar(valor: number, minimo: number, maximo: number): number {
 }
 
 /**
+ * Suma las cargas diarias de una meta acumulativa agrupadas por semana.
+ * La clave es el lunes, la misma que usa `registros_semanales.semana_inicio`.
+ */
+export function sumarPorSemana(cantidadesPorFecha: Map<string, number>): Map<string, number> {
+  const porSemana = new Map<string, number>();
+  for (const [fecha, cantidad] of cantidadesPorFecha) {
+    const clave = lunesDe(fecha);
+    porSemana.set(clave, (porSemana.get(clave) ?? 0) + cantidad);
+  }
+  return porSemana;
+}
+
+/**
  * Metrica de resultado de una meta, segun su tipo.
+ *
  * `diasMeta` son las fechas cumplidas de ESA meta; `ventana`, los dias que le
- * corresponden a la persona.
+ * corresponden a la persona. `sumasPorSemana` son las cargas diarias ya
+ * agrupadas (solo aplica a acumulativas).
  */
 export function resultadoDeMeta(
   meta: Meta,
   semanales: RegistroSemanal[],
   diasMeta: Set<string>,
   ventana: Ventana,
+  sumasPorSemana: Map<string, number> = new Map(),
 ): Resultado {
   const ordenados = [...semanales].sort((a, b) => a.semana_inicio.localeCompare(b.semana_inicio));
 
@@ -155,18 +171,38 @@ export function resultadoDeMeta(
   }
 
   if (meta.tipo === 'acumulativo') {
-    const conValor = ordenados.filter((r) => r.valor !== null);
-    const acumulado = conValor.reduce((suma, r) => suma + (r.valor ?? 0), 0);
+    /*
+     * Una semana puede venir de dos lados: de las cargas diarias o del registro
+     * semanal cargado a mano. Si hay cargas diarias, MANDAN ellas y el semanal
+     * de esa semana se ignora.
+     *
+     * Es la unica forma de que no se cuente dos veces lo mismo cuando alguien
+     * anota los kilometros dia por dia y ademas llena el resumen de la semana.
+     */
+    const porSemana = new Map<string, number>();
+    for (const r of ordenados) {
+      if (r.valor !== null) porSemana.set(r.semana_inicio, r.valor);
+    }
+    for (const [semana, suma] of sumasPorSemana) {
+      porSemana.set(semana, suma);
+    }
+
+    const filas = [...porSemana.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([semana_inicio, valor]) => ({ semana_inicio, valor }));
+
+    const acumulado = filas.reduce((suma, f) => suma + f.valor, 0);
     const objetivo = meta.valor_objetivo ?? 0;
+
     return {
       tipo: 'acumulativo',
       acumulado,
       objetivo,
       unidad: meta.unidad ?? '',
       porcentaje: objetivo > 0 ? acotar(Math.round((acumulado / objetivo) * 100), 0, 100) : 0,
-      ritmo_semanal: conValor.length ? Math.round((acumulado / conValor.length) * 10) / 10 : 0,
-      semanas_registradas: conValor.length,
-      por_semana: conValor.map((r) => ({ semana_inicio: r.semana_inicio, valor: r.valor as number })),
+      ritmo_semanal: filas.length ? Math.round((acumulado / filas.length) * 10) / 10 : 0,
+      semanas_registradas: filas.length,
+      por_semana: filas,
     };
   }
 
