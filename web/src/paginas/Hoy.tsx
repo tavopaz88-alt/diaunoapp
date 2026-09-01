@@ -13,7 +13,7 @@ import { api, ErrorApi } from '../lib/api';
 import { useCargar, Aviso, Avatar, Cargando, Etiqueta, Palomita } from '../componentes/basicos';
 import { Cuadricula } from '../componentes/Cuadricula';
 import { ResumenCorto } from '../componentes/visualizaciones';
-import { diaYNumero, diasEntre, rangoSemana, sumarDias } from '../lib/fechas';
+import { diaYNumero, diasEntre, plural, rangoSemana, sumarDias } from '../lib/fechas';
 import type { Hoy as DatosHoy } from '../tipos';
 
 export function Hoy() {
@@ -82,7 +82,9 @@ export function Hoy() {
           <p className="mini">{datos.reto.nombre}</p>
         </div>
         <div className="fila" style={{ gap: 8 }}>
-          {datos.racha > 0 && <Etiqueta variante="racha">{datos.racha} días seguidos</Etiqueta>}
+          {datos.racha > 0 && (
+            <Etiqueta variante="racha">{plural(datos.racha, 'día seguido', 'días seguidos')}</Etiqueta>
+          )}
           <Etiqueta variante="acento">{datos.constancia}%</Etiqueta>
         </div>
       </header>

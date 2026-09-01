@@ -13,7 +13,6 @@ import { nuevoId } from '../lib/ids';
 import { semanasDelReto } from '../lib/fechas';
 import {
   booleano,
-  conflicto,
   cuerpoJson,
   malaPeticion,
   noEncontrado,
@@ -27,8 +26,16 @@ import type { Direccion, TipoMeta, Visibilidad } from '../tipos';
 
 const rutas = crearRuta();
 
-/** Seccion 6.5: el limite existe para forzar foco, no por costo tecnico. */
-const MAX_METAS_ACTIVAS = 3;
+/*
+ * El spec sugeria un maximo de 3 metas activas para forzar foco. Ya no se
+ * impone: cada quien decide cuantas lleva.
+ *
+ * Se conserva como SUGERENCIA porque el costo es real y conviene decirlo en vez
+ * de bloquear: la pantalla de Hoy lista todas las metas activas, y el criterio
+ * de la seccion 12 es que marcar el dia tome menos de diez segundos. Con muchas
+ * metas eso deja de cumplirse. La app avisa; no decide por el usuario.
+ */
+const METAS_SUGERIDAS = 3;
 
 const TIPOS = ['habito', 'acumulativo', 'medicion', 'hito'] as const;
 const VISIBILIDADES = ['privada', 'titulo', 'completa'] as const;
@@ -91,7 +98,8 @@ rutas.get('/', async (c) => {
   const ventana = ventanaDe(reto, participacion.fecha_ingreso, zona);
 
   return c.json({
-    limite_activas: MAX_METAS_ACTIVAS,
+    sugerencia_activas: METAS_SUGERIDAS,
+    activas: metas.filter((m) => m.archivada === 0).length,
     metas: metas.map((meta) => ({
       ...meta,
       archivada: meta.archivada === 1,
@@ -109,17 +117,12 @@ rutas.post('/', async (c) => {
   const { perfil, reto } = c.get('ctx');
   const datos = await cuerpoJson(c.req.raw);
 
+  // Ya no hay tope. El conteo solo sirve para dar el orden de la meta nueva.
   const activas = await c.env.DB.prepare(
     'SELECT COUNT(*) AS n FROM metas WHERE user_id = ? AND reto_id = ? AND archivada = 0',
   )
     .bind(perfil.id, reto.id)
     .first<{ n: number }>();
-
-  if ((activas?.n ?? 0) >= MAX_METAS_ACTIVAS) {
-    throw conflicto(
-      `Ya tenes ${MAX_METAS_ACTIVAS} metas activas. Archiva una antes de crear otra: el limite es para mantener el foco.`,
-    );
-  }
 
   const titulo = textoRequerido(datos, 'titulo', { max: 120 });
   const descripcion = textoOpcional(datos, 'descripcion', 1000);

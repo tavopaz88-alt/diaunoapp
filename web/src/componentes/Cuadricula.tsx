@@ -22,6 +22,9 @@ interface Props {
 
 const CABECERAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+/** Por encima de esto una franja por meta ya no se distingue en el cuadrito. */
+const MAX_FRANJAS = 5;
+
 /** 0 = lunes, para que la primera columna sea lunes. */
 function columnaDe(fecha: string): number {
   const [a, m, d] = fecha.split('-').map(Number);
@@ -35,6 +38,10 @@ export function Cuadricula({ inicio, fin, hoy, series }: Props) {
 
   // Huecos al principio para que el dia 1 caiga bajo su dia de la semana.
   const relleno = columnaDe(inicio);
+
+  // Con pocas metas se dibuja una franja por meta; con muchas, un relleno
+  // proporcional, porque las franjas quedarian de dos pixeles.
+  const porFranjas = series.length <= MAX_FRANJAS;
 
   return (
     <div>
@@ -78,11 +85,25 @@ export function Cuadricula({ inicio, fin, hoy, series }: Props) {
               }`}
             >
               {!futuro && series.length > 0 && (
-                <div className="dia-franjas">
-                  {cumplidas.map((si, i) => (
-                    <div key={i} className={si ? 'dia-franja si' : 'dia-franja'} />
-                  ))}
-                </div>
+                porFranjas ? (
+                  <div className="dia-franjas">
+                    {cumplidas.map((si, i) => (
+                      <div key={i} className={si ? 'dia-franja si' : 'dia-franja'} />
+                    ))}
+                  </div>
+                ) : (
+                  /*
+                   * Con muchas metas, una franja por meta queda en dos pixeles y
+                   * no se lee. Se pasa a un relleno que sube desde abajo con la
+                   * proporcion cumplida: dice lo mismo y se ve.
+                   */
+                  <div className="dia-franjas" style={{ justifyContent: 'flex-end' }}>
+                    <div
+                      className={cuantas > 0 ? 'dia-franja si' : 'dia-franja'}
+                      style={{ flex: 'none', height: `${(cuantas / series.length) * 100}%` }}
+                    />
+                  </div>
+                )
               )}
             </div>
           );
@@ -91,7 +112,10 @@ export function Cuadricula({ inicio, fin, hoy, series }: Props) {
 
       <p className="mini" style={{ marginTop: 8 }}>
         Día 1 el {fechaLarga(inicio)} · día {diasEntre(inicio, fin) + 1} el {fechaLarga(fin)}
-        {series.length > 1 ? ` · una franja por meta (${series.length})` : ''}
+        {series.length > 1 &&
+          (porFranjas
+            ? ` · una franja por meta (${series.length})`
+            : ` · relleno proporcional sobre ${series.length} metas`)}
       </p>
     </div>
   );

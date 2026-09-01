@@ -129,6 +129,33 @@ menos de diez segundos. Manda el criterio: las casillas van arriba, antes de la
 frase, los ánimos y la cuadrícula. Además el toque es optimista, la casilla responde
 antes que la red, y si falla se revierte.
 
+### El límite de 3 metas se volvió una sugerencia
+
+El spec proponía un máximo de 3 metas activas para forzar foco. Ya no se impone:
+cada quien lleva las que quiera.
+
+El costo sigue siendo real, así que la app lo dice en vez de bloquear. Todas las
+metas activas se listan en la pantalla de Hoy, y el criterio de la sección 12 es
+que marcar el día tome menos de diez segundos; con muchas metas eso deja de
+cumplirse. Al pasar de tres aparece un aviso que explica el costo y ofrece
+archivar. Decide el usuario, no la app.
+
+La cuadrícula también se adaptó: hasta 5 metas dibuja una franja por meta, y de
+ahí en adelante pasa a un relleno proporcional. Con 10 metas cada franja quedaría
+en dos píxeles y sería ruido en vez de información.
+
+### Mover el arranque del reto también mueve los ingresos
+
+La constancia de cada persona se mide desde su `fecha_ingreso`, no desde el
+arranque del reto. Si la app se configura tres días después de que el reto empezó
+de verdad, todos quedan con una fecha de ingreso posterior: sus días anteriores no
+cuentan y ni siquiera se pueden marcar.
+
+Administración permite mover la fecha de arranque con una casilla para **alinear
+las fechas de ingreso**. Es explícita y no un efecto silencioso, y solo mueve a
+quienes ingresaron después del nuevo arranque: a quien entró tarde de verdad no lo
+toca.
+
 ### Las metas archivadas no reescriben el pasado
 
 Al dar de baja una meta: si tiene historial se **archiva**; si no tiene nada

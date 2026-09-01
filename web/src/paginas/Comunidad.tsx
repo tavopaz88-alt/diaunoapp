@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ErrorApi } from '../lib/api';
 import { useCargar, Aviso, Avatar, Cargando, Etiqueta, Vacio } from '../componentes/basicos';
-import { haceCuanto } from '../lib/fechas';
+import { haceCuanto, plural } from '../lib/fechas';
 import { useSesion } from '../lib/sesion';
 import { Publicaciones } from '../componentes/Publicaciones';
 import type { Comunidad as DatosComunidad, EventoMuro } from '../tipos';
@@ -120,7 +120,7 @@ export function Comunidad() {
           <p>
             Vas en el <strong>puesto {posicion.puesto}</strong> de {posicion.total} con{' '}
             <strong>{posicion.porcentaje}%</strong> de constancia
-            {posicion.racha > 0 && ` y ${posicion.racha} días de racha`}.
+            {posicion.racha > 0 && ` y ${plural(posicion.racha, 'día', 'días')} de racha`}.
           </p>
         ) : apareceEnRanking ? (
           <p className="tenue">Todavía no tenés posicion en el ranking.</p>

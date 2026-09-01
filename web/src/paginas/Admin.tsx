@@ -6,7 +6,7 @@
  * La API ni siquiera se los devuelve.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ErrorApi } from '../lib/api';
 import { useCargar, Aviso, Avatar, Cargando, Etiqueta } from '../componentes/basicos';
 import { fechaCorta, fechaLarga } from '../lib/fechas';
@@ -34,6 +34,20 @@ export function Admin() {
   const [texto, setTexto] = useState('');
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
+  const [nombreReto, setNombreReto] = useState('');
+  const [inicioReto, setInicioReto] = useState('');
+  const [duracionReto, setDuracionReto] = useState(30);
+  const [alinearIngresos, setAlinearIngresos] = useState(false);
+
+  // Precarga del formulario del reto. Va antes de los retornos tempranos para
+  // que el orden de los hooks no cambie entre renders.
+  const datosDelReto = reto.datos?.reto;
+  useEffect(() => {
+    if (!datosDelReto) return;
+    setNombreReto(datosDelReto.nombre);
+    setInicioReto(datosDelReto.fecha_inicio);
+    setDuracionReto(datosDelReto.duracion_dias);
+  }, [datosDelReto]);
 
   if (reto.cargando || frases.cargando || gente.cargando) return <Cargando />;
   if (!reto.datos || !frases.datos || !gente.datos) {
@@ -272,13 +286,87 @@ export function Admin() {
       {/* --- el reto --- */}
       <section className="tarjeta pila">
         <h2>El reto</h2>
-        <p>
-          <strong>{datosReto.reto.nombre}</strong>
-        </p>
         <p className="mini">
-          Del {fechaLarga(datosReto.reto.fecha_inicio)} al {fechaLarga(datosReto.reto.fecha_fin)} ·{' '}
-          {datosReto.reto.duracion_dias} días
+          Ahora mismo: del {fechaLarga(datosReto.reto.fecha_inicio)} al{' '}
+          {fechaLarga(datosReto.reto.fecha_fin)} · {datosReto.reto.duracion_dias} días
         </p>
+
+        <div className="campo">
+          <label htmlFor="reto-nombre">Nombre</label>
+          <input
+            id="reto-nombre"
+            maxLength={120}
+            value={nombreReto}
+            onChange={(e) => setNombreReto(e.target.value)}
+          />
+        </div>
+
+        <div className="fila">
+          <div className="campo crece">
+            <label htmlFor="reto-inicio">Arranca</label>
+            <input
+              id="reto-inicio"
+              type="date"
+              value={inicioReto}
+              onChange={(e) => setInicioReto(e.target.value)}
+            />
+          </div>
+          <div className="campo" style={{ width: 110 }}>
+            <label htmlFor="reto-duracion">Días</label>
+            <input
+              id="reto-duracion"
+              type="number"
+              min={7}
+              max={365}
+              value={duracionReto}
+              onChange={(e) => setDuracionReto(Number(e.target.value))}
+            />
+          </div>
+        </div>
+
+        {/*
+          Mover el arranque hacia atrás no basta por sí solo: la constancia de
+          cada quien se mide desde su fecha de ingreso, no desde la del reto.
+        */}
+        <label className="fila" style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
+          <input
+            type="checkbox"
+            checked={alinearIngresos}
+            style={{ width: 22, height: 22, flex: 'none', marginTop: 2 }}
+            onChange={(e) => setAlinearIngresos(e.target.checked)}
+          />
+          <span className="crece">
+            <strong>Alinear las fechas de ingreso</strong>
+            <br />
+            <span className="mini">
+              Marcá esto si el reto ya venía corriendo antes de configurar la app. Mueve al
+              arranque a quienes ingresaron después, para que sus días anteriores cuenten y se
+              puedan marcar. A quien entró tarde de verdad no lo toca.
+            </span>
+          </span>
+        </label>
+
+        <button
+          className="boton"
+          disabled={!nombreReto.trim() || !inicioReto}
+          onClick={() =>
+            void accion(async () => {
+              const r = await api.actualizar<{ ingresos_movidos: number }>('/admin/reto', {
+                nombre: nombreReto,
+                fecha_inicio: inicioReto,
+                duracion_dias: duracionReto,
+                alinear_ingresos: alinearIngresos,
+              });
+              await reto.recargar();
+              await gente.recargar();
+              if (r.ingresos_movidos > 0) {
+                setMensaje(`Reto actualizado · ${r.ingresos_movidos} ingreso(s) alineado(s)`);
+              }
+            }, 'Reto actualizado')
+          }
+        >
+          Guardar cambios del reto
+        </button>
       </section>
     </div>
   );

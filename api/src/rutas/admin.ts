@@ -66,7 +66,29 @@ rutas.patch('/reto', async (c) => {
     .bind(nombre, fechaInicio, duracion, reto.id)
     .run();
 
-  return c.json({ ok: true });
+  /*
+   * Mover la fecha de inicio hacia atrás no alcanza por sí solo.
+   *
+   * La constancia de cada persona se mide desde su `fecha_ingreso`, no desde el
+   * arranque del reto. Si el reto se configura tres días después de haber
+   * empezado de verdad, todos quedan con fecha_ingreso posterior y sus días
+   * anteriores no cuentan ni se pueden marcar.
+   *
+   * Por eso es una casilla explícita y no un efecto silencioso: solo mueve a
+   * quienes ingresaron DESPUÉS del nuevo arranque, y nunca empuja a nadie hacia
+   * adelante (quien entró tarde de verdad conserva su fecha).
+   */
+  let ingresosMovidos = 0;
+  if (booleano(datos, 'alinear_ingresos', false)) {
+    const resultado = await c.env.DB.prepare(
+      'UPDATE participaciones SET fecha_ingreso = ? WHERE reto_id = ? AND fecha_ingreso > ?',
+    )
+      .bind(fechaInicio, reto.id, fechaInicio)
+      .run();
+    ingresosMovidos = resultado.meta.changes ?? 0;
+  }
+
+  return c.json({ ok: true, ingresos_movidos: ingresosMovidos });
 });
 
 /** Regenera el codigo de invitacion: corta el acceso a quien ya lo tenia. */

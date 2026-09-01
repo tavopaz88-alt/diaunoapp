@@ -12,7 +12,7 @@ import { api, ErrorApi } from '../lib/api';
 import { useCargar, Aviso, Avatar, Cargando, Etiqueta } from '../componentes/basicos';
 import { CuadriculaSimple } from '../componentes/Cuadricula';
 import { Visualizacion, NOMBRE_TIPO } from '../componentes/visualizaciones';
-import { fechaCorta } from '../lib/fechas';
+import { fechaCorta, plural } from '../lib/fechas';
 import { useSesion } from '../lib/sesion';
 import type { PerfilPublico as Datos } from '../tipos';
 
@@ -55,7 +55,7 @@ export function PerfilPublico() {
             </p>
           </div>
           {constancia.racha > 0 && (
-            <Etiqueta variante="racha">{constancia.racha} días seguidos</Etiqueta>
+            <Etiqueta variante="racha">{plural(constancia.racha, 'día seguido', 'días seguidos')}</Etiqueta>
           )}
         </div>
       </section>

@@ -88,3 +88,8 @@ export function rangoSemana(inicio: string, fin: string): string {
   }
   return `del ${a.getUTCDate()} de ${MESES[a.getUTCMonth()]} al ${b.getUTCDate()} de ${MESES[b.getUTCMonth()]}`;
 }
+
+/** "1 día" / "3 días". Evita los "1 día(s)" y los "1 días seguidos". */
+export function plural(cantidad: number, singular: string, plural: string): string {
+  return `${cantidad} ${cantidad === 1 ? singular : plural}`;
+}

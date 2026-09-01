@@ -4,7 +4,9 @@ import { ResumenCorto, NOMBRE_TIPO, NOMBRE_VISIBILIDAD } from '../componentes/vi
 import type { Meta } from '../tipos';
 
 interface Datos {
-  limite_activas: number;
+  /** No es un tope: solo el punto donde la app sugiere no seguir sumando. */
+  sugerencia_activas: number;
+  activas: number;
   metas: Meta[];
 }
 
@@ -16,14 +18,15 @@ export function MisMetas() {
 
   const activas = datos.metas.filter((m) => !m.archivada);
   const archivadas = datos.metas.filter((m) => m.archivada);
-  const puedeCrear = activas.length < datos.limite_activas;
+  // No hay tope: pasarse de la sugerencia solo muestra un aviso.
+  const pasaLaSugerencia = activas.length > datos.sugerencia_activas;
 
   return (
     <div className="contenido">
       <header className="fila-entre">
         <h1>Mis metas</h1>
         <span className="mini">
-          {activas.length} de {datos.limite_activas}
+          {activas.length} activa{activas.length === 1 ? '' : 's'}
         </span>
       </header>
 
@@ -49,14 +52,20 @@ export function MisMetas() {
         ))}
       </div>
 
-      {puedeCrear ? (
-        <Link className="boton boton-ancho" to="/metas/nueva">
-          Nueva meta
-        </Link>
-      ) : (
+      <Link className="boton boton-ancho" to="/metas/nueva">
+        Nueva meta
+      </Link>
+
+      {/*
+        Aviso, no bloqueo. Todas las metas activas se listan en la pantalla de
+        Hoy, y el criterio del producto es que marcar el día tome segundos.
+        Se dice el costo y decide el usuario.
+      */}
+      {pasaLaSugerencia && (
         <p className="mini">
-          Llegaste al limite de {datos.limite_activas} metas activas. Archiva una si queres cambiar
-          de rumbo: el limite existe para sostener el foco, no por capacidad.
+          Llevás {activas.length} metas activas. Todas aparecen en la pantalla de Hoy para marcar
+          cada día, así que con muchas el marcado deja de ser cosa de segundos. Podés archivar las
+          que no estés sosteniendo; el historial no se pierde.
         </p>
       )}
 
