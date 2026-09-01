@@ -6,8 +6,15 @@ compatibility_date = "2025-09-01"
 # se vuelve a aplicar en cada despliegue.
 #
 # Con custom_domain, wrangler crea el registro DNS y pide el certificado solo.
-# Toca UNICAMENTE el subdominio; la raiz conectamierp.com no se modifica.
-routes = [{ pattern = "reto.conectamierp.com", custom_domain = true }]
+#
+# OJO: esto toca SOLO los registros web (A/AAAA/CNAME) de la raiz y de www.
+# El dominio tiene el correo corporativo en Microsoft 365, asi que sus registros
+# MX y TXT (SPF y verificacion) NO se tocan ni deben borrarse a mano: sin ellos
+# se cae el correo de todo el dominio, no solo la web.
+routes = [
+  { pattern = "conectamierp.com", custom_domain = true },
+  { pattern = "www.conectamierp.com", custom_domain = true },
+]
 
 # El mismo Worker sirve la API (/api/*) y la SPA compilada.
 # Un solo dominio => sin CORS y un solo despliegue.
@@ -32,7 +39,7 @@ crons = ["0 12 * * *"]
 
 [vars]
 ZONA_HORARIA = "America/Guatemala"
-APP_URL = "https://reto.conectamierp.com"
+APP_URL = "https://conectamierp.com"
 EMAIL_FROM = "Reto <reto@conectamierp.com>"
 EMAIL_ACTIVO = "false"
 
